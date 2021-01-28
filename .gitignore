@@ -17,3 +17,4 @@ results/*
 code/main.py
 code/benchmark_main.py
 code/run.log
+code/model_save/*
