@@ -173,6 +173,12 @@ def get_tcga_preprocessed_labeled_dataloaders(gex_features_df, drug, batch_size)
 
     return labeled_tcga_dataloader
 
+def get_pdtc_labeled_dataloaders(gex_features_df, drug, batch_size, threshold=None, tcga_cancer_type=None):
+    pass
+
+
+
+
 
 def get_ccle_labeled_dataloaders(gex_features_df, seed, drug, batch_size, ft_flag=False, threshold=None,
                                  measurement='AUC'):

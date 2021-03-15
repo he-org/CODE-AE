@@ -47,3 +47,8 @@ adae_folder = os.path.join(root_data_folder, 'adae_data')
 adae_gex_file = os.path.join(adae_folder, 'TCGA_GBM_and_LGG_PREPROCESSED_RNASEQ_EXPRESSION_500_kmeans.tsv')
 adae_sex_label_file = os.path.join(adae_folder, 'TCGA_GBM_and_LGG_SEX_LABELS.tsv')
 adae_subtype_label_file = os.path.join(adae_folder, 'TCGA_GBM_and_LGG_SUBTYPE_LABELS.tsv')
+
+#PDTC datasets
+pdtc_folder = os.path.join(root_data_folder, 'PDTC')
+gdsc_pdtc_drug_name_mapping_file = os.path.join(root_data_folder, 'pdtc_gdsc_drug_mapping.csv')
+pdtc_gex_file = os.path.join(pdtc_folder, 'ExpressionSamples.txt')
