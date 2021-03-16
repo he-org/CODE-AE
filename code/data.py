@@ -127,7 +127,6 @@ def get_tcga_labeled_dataloaders(gex_features_df, drug, batch_size, days_thresho
     if days_threshold is None:
         days_threshold = np.median(labeled_df.days_to_new_tumor_event_after_initial_treatment)
 
-
     drug_label = np.array(labeled_df.days_to_new_tumor_event_after_initial_treatment >= days_threshold, dtype='int32')
     # drug_label = np.array(labeled_df.treatment_outcome_at_tcga_followup.apply(
     #     lambda s: s not in ['Progressive Disease', 'Stable Disease', 'Persistant Disease']), dtype='int32')
@@ -146,6 +145,7 @@ def get_tcga_labeled_dataloaders(gex_features_df, drug, batch_size, days_thresho
 
 
 def get_tcga_preprocessed_labeled_dataloaders(gex_features_df, drug, batch_size):
+    drug = drug.lower()
     if drug not in ['gem', 'fu']:
         raise NotImplementedError('Only support gem or fu!')
     non_feature_file_path = os.path.join(data_config.preprocessed_data_folder, f'{drug}_non_gex.csv')
@@ -173,16 +173,36 @@ def get_tcga_preprocessed_labeled_dataloaders(gex_features_df, drug, batch_size)
 
     return labeled_tcga_dataloader
 
-def get_pdtc_labeled_dataloaders(gex_features_df, drug, batch_size, threshold=None, tcga_cancer_type=None):
-    pass
 
+def get_pdtc_labeled_dataloaders(drug, batch_size, threshold=None, measurement='AUC'):
+    pdtc_features_df = pd.read_csv(data_config.pdtc_gex_file, index_col=0)
+    target_df = pd.read_csv(data_config.pdtc_target_file, index_col=0, sep='\t')
+    drug_target_df = target_df.loc[target_df.Drug == drug]
+    labeled_samples = drug_target_df.index.intersection(pdtc_features_df.index)
+    drug_target_vec = drug_target_df.loc[labeled_samples, measurement]
+    drug_feature_df = pdtc_features_df.loc[labeled_samples]
 
+    assert all(drug_target_vec.index == drug_target_vec.index)
 
+    if threshold is None:
+        threshold = np.median(drug_target_vec)
+
+    drug_label_vec = (drug_target_vec < threshold).astype('int')
+
+    labeled_pdtc_dateset = TensorDataset(
+        torch.from_numpy(drug_feature_df.values.astype('float32')),
+        torch.from_numpy(drug_label_vec.values))
+
+    labeled_pdtc_dataloader = DataLoader(labeled_pdtc_dateset,
+                                         batch_size=batch_size,
+                                         shuffle=True)
+
+    return labeled_pdtc_dataloader
 
 
 def get_ccle_labeled_dataloaders(gex_features_df, seed, drug, batch_size, ft_flag=False, threshold=None,
                                  measurement='AUC'):
-    drugs_to_keep = [drug]
+    drugs_to_keep = [drug.lower()]
     gdsc1_response = pd.read_csv(data_config.gdsc_target_file1)
     gdsc2_response = pd.read_csv(data_config.gdsc_target_file2)
     gdsc1_sensitivity_df = gdsc1_response[['COSMIC_ID', 'DRUG_NAME', measurement]]
@@ -265,7 +285,7 @@ def get_ccle_labeled_dataloaders(gex_features_df, seed, drug, batch_size, ft_fla
 
 def get_ccle_labeled_dataloader_generator(gex_features_df, drug, batch_size, seed=2020, threshold=None,
                                           measurement='AUC'):
-    drugs_to_keep = [drug]
+    drugs_to_keep = [drug.lower()]
     gdsc1_response = pd.read_csv(data_config.gdsc_target_file1)
     gdsc2_response = pd.read_csv(data_config.gdsc_target_file2)
     gdsc1_sensitivity_df = gdsc1_response[['COSMIC_ID', 'DRUG_NAME', measurement]]
@@ -337,42 +357,61 @@ def get_ccle_labeled_dataloader_generator(gex_features_df, drug, batch_size, see
 
 def get_labeled_dataloaders(gex_features_df, drug, seed, batch_size, ccle_measurement='AUC', threshold=None,
                             days_threshold=None,
-                            ft_flag=False):
+                            ft_flag=False,
+                            pdtc_flag=False):
     """
     sensitive (responder): 1
     resistant (non-responder): 0
     """
-    drug_mapping_df = pd.read_csv(data_config.gdsc_tcga_mapping_file, index_col=0)
+    if pdtc_flag:
+        drug_mapping_df = pd.read_csv(data_config.gdsc_pdtc_drug_name_mapping_file, index_col=0)
+    else:
+        drug_mapping_df = pd.read_csv(data_config.gdsc_tcga_mapping_file, index_col=0)
     gdsc_drug = drug_mapping_df.loc[drug, 'gdsc_name']
-    tcga_drug = drug_mapping_df.loc[drug, 'tcga_name']
+    drug_name = drug_mapping_df.loc[drug, 'drug_name']
 
-    print(f'Drug: {drug}, TCGA: {tcga_drug}, GDSC: {gdsc_drug}')
+    print(f'Drug: {drug}, TCGA (PDTC): {drug_name}, GDSC: {gdsc_drug}')
+
     ccle_labeled_dataloaders = get_ccle_labeled_dataloaders(gex_features_df=gex_features_df,
                                                             threshold=threshold, seed=seed, drug=gdsc_drug,
                                                             batch_size=batch_size, ft_flag=ft_flag,
                                                             measurement=ccle_measurement)
-    if drug in ['gem', 'fu']:
-        tcga_labeled_dataloaders = get_tcga_preprocessed_labeled_dataloaders(gex_features_df=gex_features_df, drug=drug,
-                                                                             batch_size=batch_size)
+    if pdtc_flag:
+        test_labeled_dataloaders = get_pdtc_labeled_dataloaders(drug=drug_name,
+                                                                batch_size=batch_size,
+                                                                threshold=threshold,
+                                                                measurement=ccle_measurement)
     else:
-        tcga_labeled_dataloaders = get_tcga_labeled_dataloaders(gex_features_df=gex_features_df, drug=tcga_drug,
-                                                                batch_size=batch_size, days_threshold=days_threshold)
+        if drug in ['gem', 'fu']:
+            test_labeled_dataloaders = get_tcga_preprocessed_labeled_dataloaders(gex_features_df=gex_features_df,
+                                                                                 drug=drug,
+                                                                                 batch_size=batch_size)
+        else:
+            test_labeled_dataloaders = get_tcga_labeled_dataloaders(gex_features_df=gex_features_df,
+                                                                    drug=drug_name,
+                                                                    batch_size=batch_size,
+                                                                    days_threshold=days_threshold)
 
-    return ccle_labeled_dataloaders, tcga_labeled_dataloaders
+    return ccle_labeled_dataloaders, test_labeled_dataloaders
 
 
 def get_labeled_dataloader_generator(gex_features_df, drug, seed, batch_size, ccle_measurement='AUC', threshold=None,
-                                     days_threshold=None):
+                                     days_threshold=None,
+                                     pdtc_flag=False):
     """
     sensitive (responder): 1
     resistant (non-responder): 0
 
     """
-    drug_mapping_df = pd.read_csv(data_config.gdsc_tcga_mapping_file, index_col=0)
+    if pdtc_flag:
+        drug_mapping_df = pd.read_csv(data_config.gdsc_pdtc_drug_name_mapping_file, index_col=0)
+    else:
+        drug_mapping_df = pd.read_csv(data_config.gdsc_tcga_mapping_file, index_col=0)
     gdsc_drug = drug_mapping_df.loc[drug, 'gdsc_name']
-    tcga_drug = drug_mapping_df.loc[drug, 'tcga_name']
+    drug_name = drug_mapping_df.loc[drug, 'drug_name']
 
-    print(f'Drug: {drug}, TCGA: {tcga_drug}, GDSC: {gdsc_drug}')
+    print(f'Drug: {drug}, TCGA (PDTC): {drug_name}, GDSC: {gdsc_drug}')
+
     ccle_labeled_dataloader_generator = get_ccle_labeled_dataloader_generator(gex_features_df=gex_features_df,
                                                                               seed=seed,
                                                                               drug=gdsc_drug,
@@ -380,15 +419,24 @@ def get_labeled_dataloader_generator(gex_features_df, drug, seed, batch_size, cc
                                                                               threshold=threshold,
                                                                               measurement=ccle_measurement)
 
-    if drug in ['gem', 'fu']:
-        tcga_labeled_dataloaders = get_tcga_preprocessed_labeled_dataloaders(gex_features_df=gex_features_df, drug=drug,
-                                                                             batch_size=batch_size)
+    if pdtc_flag:
+        test_labeled_dataloaders = get_pdtc_labeled_dataloaders(drug=drug_name,
+                                                                batch_size=batch_size,
+                                                                threshold=threshold,
+                                                                measurement=ccle_measurement)
     else:
-        tcga_labeled_dataloaders = get_tcga_labeled_dataloaders(gex_features_df=gex_features_df, drug=tcga_drug,
-                                                                batch_size=batch_size, days_threshold=days_threshold)
+        if drug in ['gem', 'fu']:
+            test_labeled_dataloaders = get_tcga_preprocessed_labeled_dataloaders(gex_features_df=gex_features_df,
+                                                                                 drug=drug,
+                                                                                 batch_size=batch_size)
+        else:
+            test_labeled_dataloaders = get_tcga_labeled_dataloaders(gex_features_df=gex_features_df,
+                                                                    drug=drug_name,
+                                                                    batch_size=batch_size,
+                                                                    days_threshold=days_threshold)
 
     for train_labeled_ccle_dataloader, test_labeled_ccle_dataloader in ccle_labeled_dataloader_generator:
-        yield train_labeled_ccle_dataloader, test_labeled_ccle_dataloader, tcga_labeled_dataloaders
+        yield train_labeled_ccle_dataloader, test_labeled_ccle_dataloader, test_labeled_dataloaders
 
 
 def get_adae_unlabeled_dataloaders(gex_features_df, batch_size, pos_gender='female'):
