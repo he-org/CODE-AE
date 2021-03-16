@@ -141,7 +141,8 @@ def main(args, update_params_dict):
         threshold=args.a_thres,
         days_threshold=args.days_thres,
         ccle_measurement=args.measurement,
-        ft_flag=False
+        ft_flag=False,
+        pdtc_flag=args.pdtc_flag
     )
 
     # start unlabeled training
@@ -212,7 +213,8 @@ def main(args, update_params_dict):
         drug=args.drug,
         ccle_measurement=args.measurement,
         threshold=args.a_thres,
-        days_threshold=args.days_thres)
+        days_threshold=args.days_thres,
+        pdtc_flag=args.pdtc_flag)
     fold_count = 0
     for train_labeled_ccle_dataloader, test_labeled_ccle_dataloader, labeled_tcga_dataloader in labeled_dataloader_generator:
         # for seed in seeds:
@@ -266,6 +268,10 @@ if __name__ == '__main__':
     train_group.add_argument('--train', dest='retrain_flag', action='store_true')
     train_group.add_argument('--no-train', dest='retrain_flag', action='store_false')
     parser.set_defaults(retrain_flag=False)
+
+    train_group.add_argument('--pdtc', dest='pdtc_flag', action='store_true')
+    train_group.add_argument('--no-pdtc', dest='pdtc_flag', action='store_false')
+    parser.set_defaults(pdtc_flag=False)
 
     args = parser.parse_args()
 
