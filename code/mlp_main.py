@@ -179,7 +179,10 @@ def main(args, update_params_dict):
             'es_flag': False,
             'retrain_flag': args.retrain_flag
         })
-    task_save_folder = os.path.join('model_save', args.method, args.measurement, args.drug)
+    if args.pdtc_flag:
+        task_save_folder = os.path.join('model_save', args.method, args.measurement, 'pdtc', args.drug)
+    else:
+        task_save_folder = os.path.join('model_save', args.method, args.measurement, args.drug)
 
     safe_make_dir(training_params['model_save_folder'])
     safe_make_dir(task_save_folder)
