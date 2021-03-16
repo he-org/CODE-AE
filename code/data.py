@@ -202,6 +202,8 @@ def get_pdtc_labeled_dataloaders(drug, batch_size, threshold=None, measurement='
 
 def get_ccle_labeled_dataloaders(gex_features_df, seed, drug, batch_size, ft_flag=False, threshold=None,
                                  measurement='AUC'):
+    measurement = 'Z_SCORE'
+    threshold = -1.0
     drugs_to_keep = [drug.lower()]
     gdsc1_response = pd.read_csv(data_config.gdsc_target_file1)
     gdsc2_response = pd.read_csv(data_config.gdsc_target_file2)
@@ -285,6 +287,8 @@ def get_ccle_labeled_dataloaders(gex_features_df, seed, drug, batch_size, ft_fla
 
 def get_ccle_labeled_dataloader_generator(gex_features_df, drug, batch_size, seed=2020, threshold=None,
                                           measurement='AUC'):
+    measurement = 'Z_SCORE'
+    threshold = -1.0
     drugs_to_keep = [drug.lower()]
     gdsc1_response = pd.read_csv(data_config.gdsc_target_file1)
     gdsc2_response = pd.read_csv(data_config.gdsc_target_file2)
